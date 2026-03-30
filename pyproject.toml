@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythermalcamera"
-version = "0.1.1"
+dynamic = ["version"]
 authors = [
   { name="Matthew Wood", email="matt.wood@corintech.com" },
 ]
@@ -27,3 +27,6 @@ dependencies = [
 
 [project.scripts]
 pythermalcamera = "pythermalcamera.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "pythermalcamera.__version__"}
