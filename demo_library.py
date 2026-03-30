@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import time
 
 # Add src to path so we can import the library without installing it
 sys.path.append(os.path.join(os.getcwd(), 'src'))
@@ -11,14 +12,19 @@ import cv2
 def main():
     parser = argparse.ArgumentParser(description="Thermal Camera Library Demo")
     parser.add_argument("--device", type=int, default=None, help="Video Device number")
+    parser.add_argument("--preview", action="store_true", help="Enable live preview on start")
     args = parser.parse_args()
 
     print(f"Initializing Thermal Camera on device {args.device}...")
     
-    with ThermalCamera(device_id=args.device) as cam:
-        # Example 1: Use the built-in live preview
-        print("Starting live preview. Press 'q' to quit, 'p' to take a snapshot.")
-        cam.live_preview(colormap=cv2.COLORMAP_JET, scale=3, blur=1)
+    with ThermalCamera(device_id=args.device, include_preview=args.preview) as cam:
+        if not args.preview:
+            # Example 1: Use the built-in live preview (blocking)
+            print("Starting live preview. Press 'q' to quit, 'p' to take a snapshot.")
+            cam.live_preview(colormap=cv2.COLORMAP_JET, scale=3, blur=1)
+        else:
+            print("Live preview is running in background. Waiting 5 seconds before manual capture...")
+            time.sleep(5)
         
         # Example 2: Manual capture via API
         print("\nTaking a manual capture via API...")

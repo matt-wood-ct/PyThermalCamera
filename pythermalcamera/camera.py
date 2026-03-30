@@ -4,6 +4,7 @@ import time
 import io
 import os
 import json
+import threading
 
 
 class ThermalFrame:
@@ -107,7 +108,7 @@ class ThermalCamera:
             cap.release()
         return matches
 
-    def __init__(self, device_id=None):
+    def __init__(self, device_id=None, include_preview=False):
         if device_id is None:
             print("No device ID provided. Attempting to auto-detect Thermal Camera...")
             matches = self.detect_devices()
@@ -133,6 +134,21 @@ class ThermalCamera:
         # Crucial: Pull in video but do NOT automatically convert to RGB
         self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
 
+        # Default display settings
+        self.colormap = cv2.COLORMAP_JET
+        self.alpha = 1.0
+        self.scale = 3
+        self.blur = 0
+        self.threshold = 2
+        self.hud = True
+
+        self._preview_thread = None
+        self._stop_preview = threading.Event()
+        
+        if include_preview:
+            self._preview_thread = threading.Thread(target=self.live_preview, daemon=True)
+            self._preview_thread.start()
+
     def get_frame(self):
         """Capture a single frame and return a ThermalFrame object."""
         if not self.cap.isOpened():
@@ -142,8 +158,8 @@ class ThermalCamera:
             return None
         return ThermalFrame(frame)
 
-    def capture(self, filename_prefix="TC001", folder=".", colormap=cv2.COLORMAP_JET, 
-                alpha=1.0, scale=3, blur=0, frame=None):
+    def capture(self, filename_prefix="TC001", folder=".", colormap=None, 
+                alpha=None, scale=None, blur=None, frame=None):
         """
         Take a snapshot and store both the image and temperature metadata.
         Returns a dictionary with file paths and metadata.
@@ -154,6 +170,12 @@ class ThermalCamera:
         if frame is None:
             return None
         
+        # Use instance variables if parameters are not provided
+        colormap = colormap if colormap is not None else self.colormap
+        alpha = alpha if alpha is not None else self.alpha
+        scale = scale if scale is not None else self.scale
+        blur = blur if blur is not None else self.blur
+
         now = time.strftime("%Y%m%d-%H%M%S")
         img_filename = os.path.join(folder, f"{filename_prefix}_{now}.png")
         meta_filename = os.path.join(folder, f"{filename_prefix}_{now}.json")
@@ -187,11 +209,19 @@ class ThermalCamera:
             "metadata": metadata
         }
 
-    def live_preview(self, colormap=cv2.COLORMAP_JET, alpha=1.0, scale=3, blur=0, 
-                    threshold=2, hud=True):
+    def live_preview(self, colormap=None, alpha=None, scale=None, blur=None, 
+                    threshold=None, hud=None):
         """Start a live preview window with interactive controls."""
         cv2.namedWindow('Thermal', cv2.WINDOW_GUI_NORMAL)
         
+        # Override instance variables with parameters if provided
+        if colormap is not None: self.colormap = colormap
+        if alpha is not None: self.alpha = alpha
+        if scale is not None: self.scale = scale
+        if blur is not None: self.blur = blur
+        if threshold is not None: self.threshold = threshold
+        if hud is not None: self.hud = hud
+
         colormaps = [
             (cv2.COLORMAP_JET, "Jet"),
             (cv2.COLORMAP_HOT, "Hot"),
@@ -209,7 +239,7 @@ class ThermalCamera:
         # Find initial colormap index
         cmap_idx = 0
         for i, (cmap, name) in enumerate(colormaps):
-            if cmap == colormap:
+            if cmap == self.colormap:
                 cmap_idx = i
                 break
 
@@ -223,13 +253,15 @@ class ThermalCamera:
         print("  p   : Take Snapshot")
         print("  q   : Quit")
         
-        while True:
+        while not self._stop_preview.is_set():
             frame = self.get_frame()
             if frame is None:
                 break
             
             current_cmap, cmap_name = colormaps[cmap_idx]
-            heatmap = frame.get_heatmap(colormap=current_cmap, alpha=alpha, scale=scale, blur=blur)
+            self.colormap = current_cmap # Sync with instance variable for cycle colormap
+            
+            heatmap = frame.get_heatmap(colormap=self.colormap, alpha=self.alpha, scale=self.scale, blur=self.blur)
             
             # Draw Crosshair
             h, w = heatmap.shape[:2]
@@ -240,7 +272,7 @@ class ThermalCamera:
             cv2.putText(heatmap, f"{frame.center_temp} C", (w//2+10, h//2-10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,255,255), 1, cv2.LINE_AA)
 
-            if hud:
+            if self.hud:
                 # Stats box
                 cv2.rectangle(heatmap, (0, 0), (180, 120), (0,0,0), -1)
                 cv2.putText(heatmap, f"Avg: {frame.avg_temp} C", (10, 15), 
@@ -251,24 +283,24 @@ class ThermalCamera:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1, cv2.LINE_AA)
                 cv2.putText(heatmap, f"Colormap: {cmap_name}", (10, 60), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1, cv2.LINE_AA)
-                cv2.putText(heatmap, f"Blur: {blur}", (10, 75), 
+                cv2.putText(heatmap, f"Blur: {self.blur}", (10, 75), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1, cv2.LINE_AA)
-                cv2.putText(heatmap, f"Scale: {scale}", (10, 90), 
+                cv2.putText(heatmap, f"Scale: {self.scale}", (10, 90), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1, cv2.LINE_AA)
-                cv2.putText(heatmap, f"Contrast: {alpha:.1f}", (10, 105), 
+                cv2.putText(heatmap, f"Contrast: {self.alpha:.1f}", (10, 105), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,255), 1, cv2.LINE_AA)
 
             # Floating markers
-            if frame.max_temp > frame.avg_temp + threshold:
+            if frame.max_temp > frame.avg_temp + self.threshold:
                 mx, my = frame.max_pos
-                cv2.circle(heatmap, (mx*scale, my*scale), 5, (0,0,255), -1)
-                cv2.putText(heatmap, f"{frame.max_temp} C", (mx*scale+10, my*scale+5), 
+                cv2.circle(heatmap, (mx*self.scale, my*self.scale), 5, (0,0,255), -1)
+                cv2.putText(heatmap, f"{frame.max_temp} C", (mx*self.scale+10, my*self.scale+5), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,255,255), 1, cv2.LINE_AA)
 
-            if frame.min_temp < frame.avg_temp - threshold:
+            if frame.min_temp < frame.avg_temp - self.threshold:
                 lx, ly = frame.min_pos
-                cv2.circle(heatmap, (lx*scale, ly*scale), 5, (255,0,0), -1)
-                cv2.putText(heatmap, f"{frame.min_temp} C", (lx*scale+10, ly*scale+5), 
+                cv2.circle(heatmap, (lx*self.scale, ly*self.scale), 5, (255,0,0), -1)
+                cv2.putText(heatmap, f"{frame.min_temp} C", (lx*self.scale+10, ly*self.scale+5), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,255,255), 1, cv2.LINE_AA)
 
             cv2.imshow('Thermal', heatmap)
@@ -276,34 +308,40 @@ class ThermalCamera:
             if key == ord('q'):
                 break
             elif key == ord('p'):
-                res = self.capture(colormap=current_cmap, alpha=alpha, scale=scale, blur=blur, frame=frame)
+                res = self.capture(frame=frame)
                 if res:
                     print(f"Captured: {res['image']}")
             elif key == ord('a'):
-                blur += 1
+                self.blur += 1
             elif key == ord('z'):
-                blur = max(0, blur - 1)
+                self.blur = max(0, self.blur - 1)
             elif key == ord('s'):
-                threshold += 1
+                self.threshold += 1
             elif key == ord('x'):
-                threshold = max(0, threshold - 1)
+                self.threshold = max(0, self.threshold - 1)
             elif key == ord('d'):
-                scale = min(5, scale + 1)
+                self.scale = min(5, self.scale + 1)
             elif key == ord('c'):
-                scale = max(1, scale - 1)
+                self.scale = max(1, self.scale - 1)
             elif key == ord('f'):
-                alpha = min(3.0, alpha + 0.1)
+                self.alpha = min(3.0, self.alpha + 0.1)
             elif key == ord('v'):
-                alpha = max(0.1, alpha - 0.1)
+                self.alpha = max(0.1, self.alpha - 0.1)
             elif key == ord('m'):
                 cmap_idx = (cmap_idx + 1) % len(colormaps)
+                self.colormap, _ = colormaps[cmap_idx] # Update instance variable
             elif key == ord('h'):
-                hud = not hud
+                self.hud = not self.hud
                 
         cv2.destroyAllWindows()
+        self._stop_preview.set()
 
     def close(self):
         """Release the camera resources."""
+        self._stop_preview.set()
+        if self._preview_thread and self._preview_thread.is_alive():
+            self._preview_thread.join(timeout=1.0)
+            
         if self.cap:
             self.cap.release()
             self.cap = None
