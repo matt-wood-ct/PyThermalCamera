@@ -73,7 +73,51 @@ class ThermalFrame:
 class ThermalCamera:
     """Library for interacting with the Topdon TC001 Thermal Camera."""
     
-    def __init__(self, device_id=0):
+    @staticmethod
+    def detect_devices():
+        """
+        Scan /dev/video* devices to find a potential TC001 camera.
+        Returns a list of matching device IDs.
+        """
+        matches = []
+        for i in range(16):
+            dev_path = f'/dev/video{i}'
+            if not os.path.exists(dev_path):
+                continue
+                
+            cap = cv2.VideoCapture(dev_path, cv2.CAP_V4L)
+            if not cap.isOpened():
+                continue
+            
+            # Set to raw mode to check dimensions
+            cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
+            
+            # Try a couple of frames to be sure
+            for _ in range(5):
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    continue
+                
+                h, w = frame.shape[:2]
+                # TC001 is 256x384 (combined image and thermal)
+                if (h == 384 and w == 256) or (h == 256 and w == 384):
+                    matches.append(i)
+                    break
+            
+            cap.release()
+        return matches
+
+    def __init__(self, device_id=None):
+        if device_id is None:
+            print("No device ID provided. Attempting to auto-detect Thermal Camera...")
+            matches = self.detect_devices()
+            if matches:
+                device_id = matches[0]
+                print(f"Auto-detected Thermal Camera on device {device_id}")
+            else:
+                device_id = 0
+                print("Could not auto-detect. Falling back to device 0.")
+
         self.device_id = device_id
         # In Linux, VideoCapture can take a path or device ID
         # The original code uses '/dev/video' + str(dev)

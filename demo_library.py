@@ -10,7 +10,7 @@ import cv2
 
 def main():
     parser = argparse.ArgumentParser(description="Thermal Camera Library Demo")
-    parser.add_argument("--device", type=int, default=4, help="Video Device number")
+    parser.add_argument("--device", type=int, default=None, help="Video Device number")
     args = parser.parse_args()
 
     print(f"Initializing Thermal Camera on device {args.device}...")
