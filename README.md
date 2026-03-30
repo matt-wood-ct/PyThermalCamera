@@ -1,5 +1,7 @@
 # pythermalcamera - Topdon TC001 Thermal Camera Library
 
+[![PyPI version](https://badge.fury.io/py/pythermalcamera.svg)](https://pypi.org/project/pythermalcamera/)
+
 A Python library for interacting with the **Topdon TC001** thermal camera. This library simplifies device discovery, provides a live interactive preview with temperature analysis, and supports capturing full-resolution thermal images with associated JSON metadata.
 
 ## Features
@@ -22,29 +24,30 @@ A Python library for interacting with the **Topdon TC001** thermal camera. This 
 
 ## Installation
 
-Ensure you have the dependencies installed:
+Install the library directly from PyPI:
 
 ```bash
-pip install opencv-python numpy
+pip install pythermalcamera
 ```
-
-Then, include the `pythermalcamera` package in your project.
 
 ## Usage
 
-### Quick Start (Demo Script)
+### Quick Start (CLI Demo)
 
-Run the included demo to see the library in action:
+Once installed, you can run the built-in demo to see the library in action. This will auto-detect your TC001 and start an interactive preview:
 
 ```bash
-# Auto-detect camera and start interactive preview
-python3 demo_library.py
+# Start interactive preview
+pythermalcamera
 
-# Run preview in background and take a manual capture after 5 seconds
-python3 demo_library.py --preview
+# Alternatively, run as a module:
+python3 -m pythermalcamera
+
+# Use --preview to run in background and take a manual capture after 5s
+pythermalcamera --preview
 
 # Enable markers on the manual capture
-python3 demo_library.py --markers
+pythermalcamera --markers
 ```
 
 ### Basic Library API

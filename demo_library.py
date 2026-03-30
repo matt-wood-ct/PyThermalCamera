@@ -15,9 +15,7 @@ import sys
 import os
 import time
 
-# Add src to path so we can import the library without installing it
-sys.path.append(os.path.join(os.getcwd(), 'src'))
-
+# Standard imports
 from pythermalcamera import ThermalCamera
 import cv2
 

@@ -24,3 +24,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/matt-wood-ct/PyThermalCamera"
 "Bug Tracker" = "https://github.com/matt-wood-ct/PyThermalCamera/issues"
+
+[project.scripts]
+pythermalcamera = "pythermalcamera.__main__:main"
