@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pythermalcamera"
+version = "0.1.0"
+authors = [
+  { name="Matthew Wood", email="matt.wood@corintech.com" },
+]
+description = "A Python library for interacting with the Topdon TC001 thermal camera."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "opencv-python",
+    "numpy",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/matt-wood-ct/PyThermalCamera"
+"Bug Tracker" = "https://github.com/matt-wood-ct/PyThermalCamera/issues"

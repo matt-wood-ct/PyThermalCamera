@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+pythermalcamera/__init__.py
+pythermalcamera/camera.py
+pythermalcamera.egg-info/PKG-INFO
+pythermalcamera.egg-info/SOURCES.txt
+pythermalcamera.egg-info/dependency_links.txt
+pythermalcamera.egg-info/requires.txt
+pythermalcamera.egg-info/top_level.txt
