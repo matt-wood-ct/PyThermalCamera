@@ -1,3 +1,15 @@
+"""
+Thermal Camera Library Demo Script.
+
+Demonstrates the use of the pythermalcamera library for interacting with 
+the Topdon TC001 thermal camera.
+
+Based on work by Les Wright (https://github.com/leswright1977/PyThermalCamera)
+and downstream researcher LeoDJ, who reverse engineered the thermal image 
+format to extract raw temperature data.
+See LeoDJ's work here: https://github.com/LeoDJ/P2Pro-Viewer
+"""
+
 import argparse
 import sys
 import os
@@ -13,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Thermal Camera Library Demo")
     parser.add_argument("--device", type=int, default=None, help="Video Device number")
     parser.add_argument("--preview", action="store_true", help="Enable live preview on start")
+    parser.add_argument("--markers", action="store_true", help="Include markers on capture")
     args = parser.parse_args()
 
     print(f"Initializing Thermal Camera on device {args.device}...")
@@ -28,7 +41,7 @@ def main():
         
         # Example 2: Manual capture via API
         print("\nTaking a manual capture via API...")
-        result = cam.capture(filename_prefix="Manual_Capture")
+        result = cam.capture(filename_prefix="Manual_Capture", include_markers=args.markers)
         if result:
             print(f"Success!")
             print(f"Image saved to: {result['image']}")
