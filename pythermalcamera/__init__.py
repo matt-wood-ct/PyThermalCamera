@@ -9,6 +9,6 @@ and downstream researcher LeoDJ, who reverse engineered the thermal image
 format to extract raw temperature data.
 See LeoDJ's work here: https://github.com/LeoDJ/P2Pro-Viewer
 """
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from .camera import ThermalCamera, ThermalFrame
