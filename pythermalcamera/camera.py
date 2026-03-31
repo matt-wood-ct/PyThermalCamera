@@ -235,7 +235,7 @@ class ThermalCamera:
         target_roi = roi if roi is not None else self.roi
         return ThermalFrame(frame, roi=target_roi)
 
-    def capture(self, filename_prefix="TC001", folder=".", colormap=None, 
+    def capture(self, filename_prefix="Capture", folder=".", colormap=None,
                 alpha=None, scale=None, blur=None, include_markers=None, frame=None):
         """
         Take a snapshot and store both the image and temperature metadata.
@@ -444,7 +444,7 @@ class ThermalCamera:
             elif key == ord('p'):
                 res = self.capture(frame=frame, filename_prefix="Preview")
                 if res:
-                    print(f"Captured: {res['image']}")
+                    print(f"Captured: {res['image']} && {res['metadata_file']}")
             elif key == ord('a'):
                 self.blur += 1
             elif key == ord('z'):
