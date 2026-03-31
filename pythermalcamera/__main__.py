@@ -29,6 +29,9 @@ def main():
 
     print(f"Initializing Thermal Camera on device {args.device}...")
     
+    if not args.preview and not args.capture:
+        args.preview = True
+
     try:
         with ThermalCamera(device_id=args.device, include_preview=False) as cam:
             if args.preview:
