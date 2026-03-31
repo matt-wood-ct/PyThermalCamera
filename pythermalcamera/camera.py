@@ -24,6 +24,21 @@ class ThermalFrame:
         """
         self.raw_frame = raw_frame
         self.roi = roi # (x, y, w, h)
+        
+        # TC001 resolution
+        TARGET_WIDTH = 256
+        TARGET_HEIGHT = 384
+        
+        # Handle different input formats (especially on Windows)
+        if len(raw_frame.shape) == 2 and raw_frame.shape[0] == 1:
+            # 1D buffer (common with MSMF and CONVERT_RGB=0)
+            if raw_frame.shape[1] == TARGET_WIDTH * TARGET_HEIGHT * 2:
+                # 16-bit raw data
+                raw_frame = raw_frame.reshape((TARGET_HEIGHT, TARGET_WIDTH, 2))
+            elif raw_frame.shape[1] == TARGET_WIDTH * TARGET_HEIGHT * 3:
+                # 24-bit raw/BGR data
+                raw_frame = raw_frame.reshape((TARGET_HEIGHT, TARGET_WIDTH, 3))
+        
         # The frame is 256x384. Top half (256x192) is image data, 
         # bottom half (256x192) is thermal data.
         self.imdata, self.thdata = np.array_split(raw_frame, 2)
@@ -113,8 +128,16 @@ class ThermalFrame:
         :return: Colorized BGR image.
         """
         # Convert YUYV to BGR (OpenCV format)
-        bgr = cv2.cvtColor(self.imdata, cv2.COLOR_YUV2BGR_YUYV)
-        
+        if len(self.imdata.shape) == 3 and self.imdata.shape[2] == 3:
+            # Already 3 channels (e.g. backend failed to provide raw)
+            bgr = self.imdata
+        else:
+            try:
+                bgr = cv2.cvtColor(self.imdata, cv2.COLOR_YUV2BGR_YUYV)
+            except cv2.error:
+                # Fallback if cvtColor fails
+                bgr = cv2.cvtColor(self.imdata, cv2.COLOR_GRAY2BGR) if len(self.imdata.shape) == 2 else self.imdata
+
         if alpha != 1.0:
             bgr = cv2.convertScaleAbs(bgr, alpha=alpha)
         
@@ -139,35 +162,60 @@ class ThermalCamera:
     @staticmethod
     def detect_devices():
         """
-        Scan /dev/video* devices to find a potential TC001 camera.
-        Returns a list of matching device IDs.
+        Scan available video devices to find a potential TC001 camera.
+        Returns a list of tuples (device_id, backend).
         """
         matches = []
-        for i in range(16):
-            dev_path = f'/dev/video{i}'
-            if not os.path.exists(dev_path):
-                continue
-                
-            cap = cv2.VideoCapture(dev_path, cv2.CAP_V4L)
-            if not cap.isOpened():
-                continue
-            
-            # Set to raw mode to check dimensions
-            cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
-            
-            # Try a couple of frames to be sure
-            for _ in range(5):
-                ret, frame = cap.read()
-                if not ret or frame is None:
+        
+        # Determine the search range and potential backends
+        if os.name == 'nt':
+            # Windows: Try MSMF first for better raw data support, then DSHOW, then ANY
+            backends = [cv2.CAP_MSMF, cv2.CAP_DSHOW, cv2.CAP_ANY]
+            search_range = range(10)
+        else:
+            # Linux/POSIX: Try V4L2
+            backends = [cv2.CAP_V4L2, cv2.CAP_ANY]
+            search_range = range(16)
+
+        for i in search_range:
+            for backend in backends:
+                cap = cv2.VideoCapture(i, backend)
+                if not cap.isOpened():
                     continue
                 
-                h, w = frame.shape[:2]
-                # TC001 is 256x384 (combined image and thermal)
-                if (h == 384 and w == 256) or (h == 256 and w == 384):
-                    matches.append(i)
-                    break
-            
-            cap.release()
+                # Try setting the expected resolution
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 256)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 384)
+                
+                # Crucial: Pull in video but do NOT automatically convert to RGB
+                # This is essential to get the raw thermal data
+                cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
+                
+                # Try a couple of frames to be sure
+                detected = False
+                for _ in range(5):
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        continue
+                    
+                    h, w = frame.shape[:2]
+                    # TC001 is 256x384 (combined image and thermal)
+                    # Check for standard 2D shape or flat buffer from some backends (like MSMF)
+                    is_tc001 = (h == 384 and w == 256) or (h == 256 and w == 384)
+                    if not is_tc001 and h == 1:
+                        # 256 * 384 * 2 = 196608 (16-bit raw)
+                        # 256 * 384 * 3 = 294912 (24-bit raw/BGR)
+                        is_tc001 = (w == 196608 or w == 294912)
+
+                    if is_tc001:
+                        matches.append((i, backend))
+                        detected = True
+                        break
+                
+                cap.release()
+                if detected:
+                    break # Found it with this backend, no need to try others for this index
+                    
         return matches
 
     def __init__(self, device_id=None, include_preview=False):
@@ -177,27 +225,39 @@ class ThermalCamera:
         :param device_id: Video device index. If None, the library will attempt auto-detection.
         :param include_preview: If True, starts an interactive live preview in a background thread.
         """
+        backend = None
         if device_id is None:
             print("No device ID provided. Attempting to auto-detect Thermal Camera...")
             matches = self.detect_devices()
             if matches:
-                device_id = matches[0]
+                device_id, backend = matches[0]
                 print(f"Auto-detected Thermal Camera on device {device_id}")
             else:
                 device_id = 0
                 print("Could not auto-detect. Falling back to device 0.")
 
         self.device_id = device_id
-        # In Linux, VideoCapture can take a path or device ID
-        # The original code uses '/dev/video' + str(dev)
-        dev_path = f'/dev/video{device_id}'
-        if os.path.exists(dev_path):
-            self.cap = cv2.VideoCapture(dev_path, cv2.CAP_V4L)
-        else:
-            self.cap = cv2.VideoCapture(device_id)
+        
+        # Determine preferred backend if not already found during detection
+        if backend is None:
+            backend = cv2.CAP_ANY
+            if os.name == 'nt':
+                # Prefer MSMF on Windows for better raw support
+                backend = cv2.CAP_MSMF
+            elif os.name == 'posix':
+                backend = cv2.CAP_V4L2
+            
+        self.cap = cv2.VideoCapture(device_id, backend)
             
         if not self.cap.isOpened():
-            print(f"Warning: Could not open video device {device_id}")
+            # Fallback to default backend if specified one failed
+            self.cap = cv2.VideoCapture(device_id)
+            if not self.cap.isOpened():
+                print(f"Warning: Could not open video device {device_id}")
+            
+        # Set expected resolution for TC001
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 256)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 384)
             
         # Crucial: Pull in video but do NOT automatically convert to RGB
         self.cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)

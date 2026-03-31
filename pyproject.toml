@@ -15,7 +15,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
 ]
+keywords = ["thermal", "camera", "tc001", "topdon", "opencv", "temperature"]
 dependencies = [
     "opencv-python",
     "numpy",

@@ -6,7 +6,7 @@ A Python library for interacting with the **Topdon TC001** thermal camera. This 
 
 ## Features
 
-- **Auto-Detection**: Automatically finds the correct video device ID for the TC001 by scanning `/dev/video*`.
+- **Auto-Detection**: Automatically finds the correct video device ID for the TC001 by scanning available video devices (V4L2 on Linux, MSMF or DSHOW on Windows).
 - **Live Preview**: Interactive window showing the thermal heatmap with a center crosshair, HUD, and real-time statistics (Min/Max/Avg).
 - **Area of Interest (ROI)**: Interactively select a region in the preview to focus temperature analysis (statistics will only reflect the chosen box).
 - **High-Quality Captures**: Save colorized heatmaps as PNG and full temperature metadata as JSON.
@@ -17,7 +17,7 @@ A Python library for interacting with the **Topdon TC001** thermal camera. This 
 ## Prerequisites
 
 - **Hardware**: Topdon TC001 Thermal Camera.
-- **Operating System**: Linux (developed and tested on Linux with V4L2).
+- **Operating System**: Linux (developed and tested with V4L2) or Windows (tested with MSMF/DSHOW).
 - **Dependencies**:
   - `opencv-python`
   - `numpy`
